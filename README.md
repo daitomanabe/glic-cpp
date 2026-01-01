@@ -8,9 +8,15 @@
 
 C++によるGLIC (GLitch Image Codec) のコマンドライン実装です。
 
-### ベースプロジェクト
+### クレジット / Credits
 
-このプロジェクトは [GlitchCodec/GLIC](https://github.com/GlitchCodec/GLIC) をベースにしています。オリジナルのProcessing (Java) 版から完全にポートし、さらに新しいグリッチ効果を追加しています。
+**このプロジェクトは [GlitchCodec/GLIC](https://github.com/GlitchCodec/GLIC) のJava/Processing版をC++にポートしたものです。**
+
+- **オリジナル**: [GlitchCodec/GLIC](https://github.com/GlitchCodec/GLIC) (Java/Processing)
+- **ドキュメント**: [GLIC Documentation](https://docs.google.com/document/d/1cdJvEmSKNAkzkU0dFUa-kb_QJB2ISQg-QfCqpHLFlck/edit) - GlitchCodec/GLICより
+- **C++ポート**: このリポジトリ
+
+オリジナルのProcessing版から完全にポートし、さらに新しいグリッチ効果を追加しています。
 
 ### 特徴
 
@@ -93,9 +99,9 @@ RGB, HSB, HWB, OHTA, CMY, XYZ, YXY, LAB, LUV, HCL, YUV, YPbPr, YCbCr, YDbDr, GS,
 
 #### 予測アルゴリズム (24種類)
 
-**基本予測 (16種類):** NONE, CORNER, H, V, DC, DCMEDIAN, MEDIAN, AVG, TRUEMOTION, PAETH, LDIAG, HV, JPEGLS, DIFF, REF, ANGLE
+**基本予測 (16種類 - オリジナルGLIC):** NONE, CORNER, H, V, DC, DCMEDIAN, MEDIAN, AVG, TRUEMOTION, PAETH, LDIAG, HV, JPEGLS, DIFF, REF, ANGLE
 
-**新規追加 (8種類):**
+**C++版で追加 (8種類):**
 | 名前 | 説明 |
 |------|------|
 | SPIRAL | 中心からスパイラル状に予測 |
@@ -111,11 +117,11 @@ RGB, HSB, HWB, OHTA, CMY, XYZ, YXY, LAB, LUV, HCL, YUV, YPbPr, YCbCr, YDbDr, GS,
 
 #### エンコード方式 (6種類)
 
-**基本 (3種類):** raw, packed, rle
+**基本 (3種類 - オリジナルGLIC):** raw, packed, rle
 
-**新規追加 (3種類):** delta, xor, zigzag
+**C++版で追加 (3種類):** delta, xor, zigzag
 
-#### ポストエフェクト (6種類) - 新機能
+#### ポストエフェクト (6種類) - C++版新機能
 
 | 名前 | 説明 |
 |------|------|
@@ -141,9 +147,15 @@ Haar, Daubechies (DB2-DB10), Symlet (SYM2-SYM10), Coiflet (COIF1-COIF5)
 
 A C++ command-line implementation of GLIC (GLitch Image Codec).
 
-### Based On
+### Credits
 
-This project is based on [GlitchCodec/GLIC](https://github.com/GlitchCodec/GLIC). It is a complete port from the original Processing (Java) version with additional glitch effects.
+**This project is a C++ port of the Java/Processing version of [GlitchCodec/GLIC](https://github.com/GlitchCodec/GLIC).**
+
+- **Original**: [GlitchCodec/GLIC](https://github.com/GlitchCodec/GLIC) (Java/Processing)
+- **Documentation**: [GLIC Documentation](https://docs.google.com/document/d/1cdJvEmSKNAkzkU0dFUa-kb_QJB2ISQg-QfCqpHLFlck/edit) - From GlitchCodec/GLIC
+- **C++ Port**: This repository
+
+This is a complete port from the original Processing version with additional glitch effects.
 
 ### Features
 
@@ -226,9 +238,9 @@ RGB, HSB, HWB, OHTA, CMY, XYZ, YXY, LAB, LUV, HCL, YUV, YPbPr, YCbCr, YDbDr, GS,
 
 #### Prediction Algorithms (24 types)
 
-**Basic (16 types):** NONE, CORNER, H, V, DC, DCMEDIAN, MEDIAN, AVG, TRUEMOTION, PAETH, LDIAG, HV, JPEGLS, DIFF, REF, ANGLE
+**Basic (16 types - Original GLIC):** NONE, CORNER, H, V, DC, DCMEDIAN, MEDIAN, AVG, TRUEMOTION, PAETH, LDIAG, HV, JPEGLS, DIFF, REF, ANGLE
 
-**New additions (8 types):**
+**Added in C++ version (8 types):**
 | Name | Description |
 |------|-------------|
 | SPIRAL | Spiral prediction from center |
@@ -244,11 +256,11 @@ RGB, HSB, HWB, OHTA, CMY, XYZ, YXY, LAB, LUV, HCL, YUV, YPbPr, YCbCr, YDbDr, GS,
 
 #### Encoding Methods (6 types)
 
-**Basic (3 types):** raw, packed, rle
+**Basic (3 types - Original GLIC):** raw, packed, rle
 
-**New additions (3 types):** delta, xor, zigzag
+**Added in C++ version (3 types):** delta, xor, zigzag
 
-#### Post Effects (6 types) - New Feature
+#### Post Effects (6 types) - New in C++ version
 
 | Name | Description |
 |------|-------------|
@@ -274,7 +286,10 @@ Haar, Daubechies (DB2-DB10), Symlet (SYM2-SYM10), Coiflet (COIF1-COIF5)
 
 MIT License
 
-## Credits
+## Acknowledgments
 
-- Original GLIC: [GlitchCodec/GLIC](https://github.com/GlitchCodec/GLIC)
-- stb_image: [nothings/stb](https://github.com/nothings/stb)
+This project would not be possible without:
+
+- **[GlitchCodec/GLIC](https://github.com/GlitchCodec/GLIC)** - The original GLIC implementation in Java/Processing. This C++ version is a port of their work.
+- **[GLIC Documentation](https://docs.google.com/document/d/1cdJvEmSKNAkzkU0dFUa-kb_QJB2ISQg-QfCqpHLFlck/edit)** - Original documentation from GlitchCodec/GLIC
+- **[nothings/stb](https://github.com/nothings/stb)** - stb_image library for image I/O
