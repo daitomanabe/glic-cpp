@@ -17,6 +17,7 @@
 #include <fstream>
 #include <iostream>
 #include <cstring>
+#include <array>
 
 namespace glic {
 
@@ -44,10 +45,10 @@ std::vector<uint8_t> GlicCodec::encodeToBuffer(const Color* pixels, int width, i
         Planes planes(pixels, width, height, config_.colorSpace, ref);
 
         // Arrays to store segmentation and data for each channel
-        std::vector<Segment> segments[3];
-        std::vector<uint8_t> segmentationData[3];
-        std::vector<uint8_t> predictionData[3];
-        std::vector<uint8_t> imageData[3];
+        std::array<std::vector<Segment>, 3> segments;
+        std::array<std::vector<uint8_t>, 3> segmentationData;
+        std::array<std::vector<uint8_t>, 3> predictionData;
+        std::array<std::vector<uint8_t>, 3> imageData;
 
         // Process each channel
         for (int p = 0; p < 3; p++) {
@@ -351,9 +352,9 @@ GlicResult GlicCodec::decodeFromBuffer(const std::vector<uint8_t>& buffer) {
         uint8_t borderB = buffer[pos++];
 
         // Read sizes
-        uint32_t segmentationSizes[3];
-        uint32_t predictionSizes[3];
-        uint32_t dataSizes[3];
+        std::array<uint32_t, 3> segmentationSizes{};
+        std::array<uint32_t, 3> predictionSizes{};
+        std::array<uint32_t, 3> dataSizes{};
 
         for (int p = 0; p < 3; p++) {
             segmentationSizes[p] = (static_cast<uint32_t>(buffer[pos]) << 24) |
@@ -381,7 +382,7 @@ GlicResult GlicCodec::decodeFromBuffer(const std::vector<uint8_t>& buffer) {
         pos = GLIC_HEADER_SIZE;
 
         // Read channel configs
-        ChannelConfig channelConfigs[3];
+        std::array<ChannelConfig, 3> channelConfigs{};
         for (int p = 0; p < 3; p++) {
             channelConfigs[p].predictionMethod = static_cast<PredictionMethod>(static_cast<int8_t>(buffer[pos++]));
             channelConfigs[p].quantizationValue = buffer[pos++];
@@ -410,7 +411,7 @@ GlicResult GlicCodec::decodeFromBuffer(const std::vector<uint8_t>& buffer) {
         while (hh < height) hh *= 2;
 
         // Read segmentation data and reconstruct segments
-        std::vector<Segment> segments[3];
+        std::array<std::vector<Segment>, 3> segments;
         for (int p = 0; p < 3; p++) {
             std::cout << "Channel " << p << " segmentation" << std::endl;
             BitReader segReader(buffer.data() + pos, segmentationSizes[p]);

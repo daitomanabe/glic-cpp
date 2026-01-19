@@ -105,46 +105,52 @@ bool PresetLoader::parseJavaHashMap(const std::vector<uint8_t>& data, PresetData
     }
 
     // Parse float array values (clamp and transtype)
-    for (const auto& key : FLOAT_ARRAY_KEYS) {
-        int pos = findString(data, key);
-        if (pos != -1) {
-            size_t searchStart = pos + key.length();
-            size_t searchEnd = std::min(searchStart + 60, data.size() - 12);
-
-            for (size_t i = searchStart; i < searchEnd; i++) {
-                // Look for float array pattern: "ur" or "uq" followed by "[F" marker
-                if (i + 2 < data.size() && (data[i] == 'u') && (data[i + 1] == 'r' || data[i + 1] == 'q')) {
-                    // Find "[F" marker
-                    for (size_t j = i + 2; j < i + 20 && j + 1 < data.size(); j++) {
-                        if (data[j] == '[' && data[j + 1] == 'F') {
-                            // Skip class descriptor, find "xp" + array length + data
-                            for (size_t k = j + 2; k < j + 30 && k + 4 < data.size(); k++) {
-                                if (data[k] == 'x' && data[k + 1] == 'p') {
-                                    // Next 4 bytes are array length (big endian int)
-                                    size_t arrLen = (static_cast<size_t>(data[k + 2]) << 24) |
-                                                   (static_cast<size_t>(data[k + 3]) << 16) |
-                                                   (static_cast<size_t>(data[k + 4]) << 8) |
-                                                   static_cast<size_t>(data[k + 5]);
-                                    if (arrLen > 0 && arrLen <= 10) {
-                                        std::vector<float> arr;
-                                        size_t arrStart = k + 6;
-                                        for (size_t a = 0; a < arrLen && arrStart + 4 <= data.size(); a++) {
-                                            float val = readJavaFloat(&data[arrStart]);
-                                            arr.push_back(val);
-                                            arrStart += 4;
-                                        }
-                                        if (!arr.empty()) {
-                                            preset.floatArrayValues[key] = arr;
-                                        }
+    auto tryParseFloatArray = [&data](size_t searchStart, size_t searchEnd) -> std::optional<std::vector<float>> {
+        for (size_t i = searchStart; i < searchEnd; i++) {
+            // Look for float array pattern: "ur" or "uq" followed by "[F" marker
+            if (i + 2 < data.size() && (data[i] == 'u') && (data[i + 1] == 'r' || data[i + 1] == 'q')) {
+                // Find "[F" marker
+                for (size_t j = i + 2; j < i + 20 && j + 1 < data.size(); j++) {
+                    if (data[j] == '[' && data[j + 1] == 'F') {
+                        // Skip class descriptor, find "xp" + array length + data
+                        for (size_t k = j + 2; k < j + 30 && k + 4 < data.size(); k++) {
+                            if (data[k] == 'x' && data[k + 1] == 'p') {
+                                // Next 4 bytes are array length (big endian int)
+                                size_t arrLen = (static_cast<size_t>(data[k + 2]) << 24) |
+                                               (static_cast<size_t>(data[k + 3]) << 16) |
+                                               (static_cast<size_t>(data[k + 4]) << 8) |
+                                               static_cast<size_t>(data[k + 5]);
+                                if (arrLen > 0 && arrLen <= 10) {
+                                    std::vector<float> arr;
+                                    size_t arrStart = k + 6;
+                                    for (size_t a = 0; a < arrLen && arrStart + 4 <= data.size(); a++) {
+                                        float val = readJavaFloat(&data[arrStart]);
+                                        arr.push_back(val);
+                                        arrStart += 4;
                                     }
-                                    goto next_array_key;
+                                    if (!arr.empty()) {
+                                        return arr;
+                                    }
                                 }
+                                return std::nullopt;
                             }
                         }
                     }
                 }
             }
-            next_array_key:;
+        }
+        return std::nullopt;
+    };
+
+    for (const auto& key : FLOAT_ARRAY_KEYS) {
+        int pos = findString(data, key);
+        if (pos != -1) {
+            size_t searchStart = pos + key.length();
+            size_t searchEnd = std::min(searchStart + 60, data.size() - 12);
+            auto result = tryParseFloatArray(searchStart, searchEnd);
+            if (result.has_value()) {
+                preset.floatArrayValues[key] = result.value();
+            }
         }
     }
 

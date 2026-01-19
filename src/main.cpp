@@ -6,10 +6,72 @@
 #include <string>
 #include <vector>
 #include <algorithm>
-#include <cstring>
 #include <filesystem>
+#include <sstream>
+#include <optional>
 
 using namespace glic;
+
+// Safe string to int conversion with default value
+std::optional<int> safeStoi(const std::string& str) {
+    try {
+        size_t pos;
+        int result = std::stoi(str, &pos);
+        if (pos != str.size()) return std::nullopt;
+        return result;
+    } catch (const std::exception&) {
+        return std::nullopt;
+    }
+}
+
+// Safe string to float conversion with default value
+std::optional<float> safeStof(const std::string& str) {
+    try {
+        size_t pos;
+        float result = std::stof(str, &pos);
+        if (pos != str.size()) return std::nullopt;
+        return result;
+    } catch (const std::exception&) {
+        return std::nullopt;
+    }
+}
+
+// Parse comma-separated RGB values (e.g., "128,128,128")
+bool parseRGB(const std::string& str, int& r, int& g, int& b) {
+    std::istringstream ss(str);
+    std::string token;
+    std::vector<int> values;
+
+    while (std::getline(ss, token, ',')) {
+        auto val = safeStoi(token);
+        if (!val.has_value()) return false;
+        values.push_back(val.value());
+    }
+
+    if (values.size() != 3) return false;
+    r = values[0];
+    g = values[1];
+    b = values[2];
+    return true;
+}
+
+// Parse comma-separated XY values (e.g., "2,0")
+bool parseXY(const std::string& str, int& x, int& y) {
+    std::istringstream ss(str);
+    std::string token;
+    std::vector<int> values;
+
+    while (std::getline(ss, token, ',')) {
+        auto val = safeStoi(token);
+        if (!val.has_value()) return false;
+        values.push_back(val.value());
+    }
+
+    if (values.size() < 1) return false;
+    x = values[0];
+    y = (values.size() >= 2) ? values[1] : 0;
+    return true;
+}
 
 // Get default presets directory (relative to executable or current directory)
 std::string getDefaultPresetsDir(const char* programPath) {
@@ -132,24 +194,32 @@ bool parseArgs(int argc, char* argv[], std::string& command, std::string& input,
             config.colorSpace = colorSpaceFromName(argv[++i]);
         }
         else if (arg == "--min-block" && i + 1 < argc) {
-            int val = std::stoi(argv[++i]);
-            for (auto& ch : config.channels) ch.minBlockSize = val;
+            auto val = safeStoi(argv[++i]);
+            if (val.has_value()) {
+                for (auto& ch : config.channels) ch.minBlockSize = val.value();
+            }
         }
         else if (arg == "--max-block" && i + 1 < argc) {
-            int val = std::stoi(argv[++i]);
-            for (auto& ch : config.channels) ch.maxBlockSize = val;
+            auto val = safeStoi(argv[++i]);
+            if (val.has_value()) {
+                for (auto& ch : config.channels) ch.maxBlockSize = val.value();
+            }
         }
         else if (arg == "--threshold" && i + 1 < argc) {
-            float val = std::stof(argv[++i]);
-            for (auto& ch : config.channels) ch.segmentationPrecision = val;
+            auto val = safeStof(argv[++i]);
+            if (val.has_value()) {
+                for (auto& ch : config.channels) ch.segmentationPrecision = val.value();
+            }
         }
         else if (arg == "--prediction" && i + 1 < argc) {
             auto val = predictionFromName(argv[++i]);
             for (auto& ch : config.channels) ch.predictionMethod = val;
         }
         else if (arg == "--quantization" && i + 1 < argc) {
-            int val = std::stoi(argv[++i]);
-            for (auto& ch : config.channels) ch.quantizationValue = val;
+            auto val = safeStoi(argv[++i]);
+            if (val.has_value()) {
+                for (auto& ch : config.channels) ch.quantizationValue = val.value();
+            }
         }
         else if (arg == "--clamp" && i + 1 < argc) {
             std::string val = argv[++i];
@@ -166,8 +236,10 @@ bool parseArgs(int argc, char* argv[], std::string& command, std::string& input,
             for (auto& ch : config.channels) ch.transformType = tt;
         }
         else if (arg == "--scale" && i + 1 < argc) {
-            int val = std::stoi(argv[++i]);
-            for (auto& ch : config.channels) ch.transformScale = val;
+            auto val = safeStoi(argv[++i]);
+            if (val.has_value()) {
+                for (auto& ch : config.channels) ch.transformScale = val.value();
+            }
         }
         else if (arg == "--encoding" && i + 1 < argc) {
             auto val = encodingFromName(argv[++i]);
@@ -176,10 +248,10 @@ bool parseArgs(int argc, char* argv[], std::string& command, std::string& input,
         else if (arg == "--border" && i + 1 < argc) {
             std::string colorStr = argv[++i];
             int r = 128, g = 128, b = 128;
-            if (sscanf(colorStr.c_str(), "%d,%d,%d", &r, &g, &b) == 3) {
-                config.borderColorR = static_cast<uint8_t>(r);
-                config.borderColorG = static_cast<uint8_t>(g);
-                config.borderColorB = static_cast<uint8_t>(b);
+            if (parseRGB(colorStr, r, g, b)) {
+                config.borderColorR = static_cast<uint8_t>(std::clamp(r, 0, 255));
+                config.borderColorG = static_cast<uint8_t>(std::clamp(g, 0, 255));
+                config.borderColorB = static_cast<uint8_t>(std::clamp(b, 0, 255));
             }
         }
         // Post-effect options
@@ -193,21 +265,30 @@ bool parseArgs(int argc, char* argv[], std::string& command, std::string& input,
             }
         }
         else if (arg == "--effect-intensity" && i + 1 < argc) {
-            currentEffect.intensity = std::stoi(argv[++i]);
+            auto val = safeStoi(argv[++i]);
+            if (val.has_value()) {
+                currentEffect.intensity = val.value();
+            }
         }
         else if (arg == "--effect-blocksize" && i + 1 < argc) {
-            currentEffect.blockSize = std::stoi(argv[++i]);
+            auto val = safeStoi(argv[++i]);
+            if (val.has_value()) {
+                currentEffect.blockSize = val.value();
+            }
         }
         else if (arg == "--effect-offset" && i + 1 < argc) {
             std::string offsetStr = argv[++i];
             int x = 2, y = 0;
-            if (sscanf(offsetStr.c_str(), "%d,%d", &x, &y) >= 1) {
+            if (parseXY(offsetStr, x, y)) {
                 currentEffect.offsetX = x;
                 currentEffect.offsetY = y;
             }
         }
         else if (arg == "--effect-levels" && i + 1 < argc) {
-            currentEffect.levels = std::stoi(argv[++i]);
+            auto val = safeStoi(argv[++i]);
+            if (val.has_value()) {
+                currentEffect.levels = val.value();
+            }
         }
         else if (arg == "--help" || arg == "-h") {
             return false;
