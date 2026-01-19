@@ -5,22 +5,7 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-# Download stb_image if not present
-if(NOT EXISTS "${CMAKE_SOURCE_DIR}/external/stb_image.h")
-    file(DOWNLOAD
-        "https://raw.githubusercontent.com/nothings/stb/master/stb_image.h"
-        "${CMAKE_SOURCE_DIR}/external/stb_image.h"
-        SHOW_PROGRESS
-    )
-endif()
-
-if(NOT EXISTS "${CMAKE_SOURCE_DIR}/external/stb_image_write.h")
-    file(DOWNLOAD
-        "https://raw.githubusercontent.com/nothings/stb/master/stb_image_write.h"
-        "${CMAKE_SOURCE_DIR}/external/stb_image_write.h"
-        SHOW_PROGRESS
-    )
-endif()
+# stb library is included as a git submodule in external/stb
 
 # Source files
 set(SOURCES
@@ -58,7 +43,7 @@ add_executable(glic ${SOURCES} ${HEADERS})
 
 target_include_directories(glic PRIVATE
     ${CMAKE_SOURCE_DIR}/src
-    ${CMAKE_SOURCE_DIR}/external
+    ${CMAKE_SOURCE_DIR}/external/stb
 )
 
 # Compiler warnings
