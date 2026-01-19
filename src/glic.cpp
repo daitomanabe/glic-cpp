@@ -18,6 +18,9 @@
 #include <iostream>
 #include <cstring>
 #include <array>
+#include <span>
+#include <ranges>
+#include <bit>
 
 namespace glic {
 

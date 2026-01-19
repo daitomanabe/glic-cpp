@@ -6,7 +6,7 @@
 
 ## 日本語
 
-C++によるGLIC (GLitch Image Codec) のコマンドライン実装です。
+C++20によるGLIC (GLitch Image Codec) のコマンドライン実装です。
 
 ### クレジット / Credits
 
@@ -20,13 +20,15 @@ C++によるGLIC (GLitch Image Codec) のコマンドライン実装です。
 
 ### 特徴
 
-- Processing版の全機能をC++17で再実装
+- Processing版の全機能をC++20で再実装
+- モダンC++機能を活用（`std::ranges`, `std::span`, `std::bit_cast`, `[[likely]]`属性など）
 - クロスプラットフォーム対応 (macOS, Linux, Windows)
 - コマンドラインインターフェース
 - **144種類のプリセット対応** (オリジナルGLICのプリセットファイルを読み込み)
 - 24種類の予測アルゴリズム（8種類追加）
 - 6種類のエンコーディング方式（3種類追加）
 - 6種類のポストプロセッシングエフェクト（新機能）
+- テスト用画像付属（`daito-testimage.png`）
 
 ### ビルド方法
 
@@ -117,12 +119,89 @@ cmake --build .
 
 `examples/` ディレクトリにサンプルスクリプトがあります：
 
-```bash
-# クイックスタートガイドを表示
-./examples/quick_start.sh
+#### quick_start.sh
 
-# 複数のプリセットをテスト
+クイックスタートガイドを表示します。利用可能なプリセットの一覧と基本的なコマンド例を確認できます。
+
+```bash
+./examples/quick_start.sh
+```
+
+**出力例：**
+```
+============================================
+GLIC Quick Start
+============================================
+
+1. List available presets:
+   $ ./build/glic --list-presets
+
+  8-b1tz
+  abstract_expressionism
+  bl33dyl1n3z
+  blocks
+  ...
+
+2. Show help:
+   $ ./build/glic --help
+
+3. Example commands:
+
+   # Basic encode/decode
+   ./build/glic encode input.png output.glic
+   ./build/glic decode output.glic result.png
+
+   # Encode with preset
+   ./build/glic encode input.png output.glic --preset colour_waves
+```
+
+#### test_presets.sh
+
+複数のプリセットを一括でテストし、出力ファイルを生成します。
+
+```bash
 ./examples/test_presets.sh input.png
+```
+
+**テストされるプリセット：**
+- `default` - デフォルト設定
+- `colour_waves` - カラーウェーブ効果
+- `cubism` - キュビズム風
+- `8-b1tz` - 8ビット風グリッチ
+- `bl33dyl1n3z` - ブリーディングライン
+- `high_compression` - 高圧縮
+- `abstract_expressionism` - 抽象表現主義風
+- `blocks` - ブロック状
+- `scanlined` - スキャンライン
+- `webp` - WebP風圧縮
+
+**出力例：**
+```
+============================================
+GLIC Preset Test
+============================================
+Input: photo.png
+Output directory: examples/output
+
+--------------------------------------------
+Testing preset: colour_waves
+--------------------------------------------
+  Encoding...
+  Decoding...
+  Output: examples/output/photo_colour_waves.png (245K)
+```
+
+#### 付属のテスト画像を使う
+
+リポジトリにはテスト用画像 `daito-testimage.png` が含まれています：
+
+```bash
+# テスト画像でプリセットをテスト
+./examples/test_presets.sh daito-testimage.png
+
+# 直接エンコード
+./build/glic encode daito-testimage.png output.glic --preset cubism
+./build/glic decode output.glic result.png
 ```
 
 ### 機能一覧
@@ -170,15 +249,20 @@ Haar, Daubechies (DB2-DB10), Symlet (SYM2-SYM10), Coiflet (COIF1-COIF5)
 
 ### 依存関係
 
-- C++17 以上
-- CMake 3.14 以上
-- stb_image / stb_image_write (ビルド時に自動ダウンロード)
+- C++20 以上（clang 13+, gcc 10+, MSVC 19.29+）
+- CMake 3.16 以上
+- stb_image / stb_image_write（gitサブモジュールとして含まれています）
+
+### ブランチ
+
+- `master` - C++20版（推奨）
+- `cpp17` - C++17版（互換性のため）
 
 ---
 
 ## English
 
-A C++ command-line implementation of GLIC (GLitch Image Codec).
+A C++20 command-line implementation of GLIC (GLitch Image Codec).
 
 ### Credits
 
@@ -192,13 +276,15 @@ This is a complete port from the original Processing version with additional gli
 
 ### Features
 
-- Full reimplementation of Processing version in C++17
+- Full reimplementation of Processing version in C++20
+- Modern C++ features (`std::ranges`, `std::span`, `std::bit_cast`, `[[likely]]` attributes, etc.)
 - Cross-platform support (macOS, Linux, Windows)
 - Command-line interface
 - **144 presets supported** (loads original GLIC preset files)
 - 24 prediction algorithms (+8 new)
 - 6 encoding methods (+3 new)
 - 6 post-processing effects (new feature)
+- Test image included (`daito-testimage.png`)
 
 ### Build
 
@@ -289,12 +375,35 @@ cmake --build .
 
 Sample scripts are available in the `examples/` directory:
 
-```bash
-# Show quick start guide
-./examples/quick_start.sh
+#### quick_start.sh
 
-# Test multiple presets
+Displays a quick start guide with available presets and example commands.
+
+```bash
+./examples/quick_start.sh
+```
+
+#### test_presets.sh
+
+Tests multiple presets at once and generates output files.
+
+```bash
 ./examples/test_presets.sh input.png
+```
+
+**Tested presets:** default, colour_waves, cubism, 8-b1tz, bl33dyl1n3z, high_compression, abstract_expressionism, blocks, scanlined, webp
+
+#### Using the included test image
+
+The repository includes a test image `daito-testimage.png`:
+
+```bash
+# Test presets with the included image
+./examples/test_presets.sh daito-testimage.png
+
+# Direct encode
+./build/glic encode daito-testimage.png output.glic --preset cubism
+./build/glic decode output.glic result.png
 ```
 
 ### Feature List
@@ -342,9 +451,14 @@ Haar, Daubechies (DB2-DB10), Symlet (SYM2-SYM10), Coiflet (COIF1-COIF5)
 
 ### Dependencies
 
-- C++17 or later
-- CMake 3.14 or later
-- stb_image / stb_image_write (auto-downloaded during build)
+- C++20 or later (clang 13+, gcc 10+, MSVC 19.29+)
+- CMake 3.16 or later
+- stb_image / stb_image_write (included as git submodule)
+
+### Branches
+
+- `master` - C++20 version (recommended)
+- `cpp17` - C++17 version (for compatibility)
 
 ---
 
