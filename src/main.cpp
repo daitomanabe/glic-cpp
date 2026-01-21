@@ -156,12 +156,16 @@ void printUsage(std::string_view programName) {
               << "  --border <r,g,b>         Border color RGB (default: 128,128,128)\n"
               << "\nDecode Options (Post-Effects):\n"
               << "  --effect <name>          Apply post effect (can be used multiple times)\n"
-              << "                           Options: pixelate, scanline, chromatic, dither,\n"
-              << "                                    posterize, glitch\n"
+              << "                           Basic: pixelate, scanline, chromatic, dither, posterize, glitch\n"
+              << "                           Advanced: dct, sort, leak\n"
               << "  --effect-intensity <n>   Effect intensity 0-100 (default: 50)\n"
-              << "  --effect-blocksize <n>   Effect block size for pixelate/glitch (default: 8)\n"
+              << "  --effect-blocksize <n>   Block size for pixelate/glitch/dct/leak (default: 8)\n"
               << "  --effect-offset <x,y>    Chromatic aberration offset (default: 2,0)\n"
               << "  --effect-levels <n>      Posterize levels (default: 4)\n"
+              << "  --effect-threshold <n>   Pixel sort threshold 0-255 (default: 50)\n"
+              << "  --effect-sortmode <m>    Sort mode: brightness, hue, saturation, red, green, blue\n"
+              << "  --effect-vertical        Enable vertical sorting (default: horizontal)\n"
+              << "  --effect-leak <f>        Prediction leak amount 0.0-1.0 (default: 0.5)\n"
               << "\nExamples:\n"
               << "  " << programName << " encode photo.png glitched.glic\n"
               << "  " << programName << " encode photo.png glitched.glic --colorspace HWB --prediction SPIRAL\n"
@@ -175,9 +179,7 @@ void printUsage(std::string_view programName) {
         return false;
     }
 
-    // Check for --list-presets first using ranges
-    auto argStrings = args.subspan(1) | std::views::transform([](char* s) { return std::string_view(s); });
-
+    // Check for --list-presets first
     for (size_t i = 1; i < args.size(); ++i) {
         std::string_view arg = args[i];
         if (arg == "--list-presets") {
@@ -211,7 +213,12 @@ void printUsage(std::string_view programName) {
         .blockSize = 8,
         .offsetX = 2,
         .offsetY = 0,
-        .levels = 4
+        .levels = 4,
+        .seed = 12345,
+        .sortMode = PixelSortMode::BRIGHTNESS,
+        .threshold = 50,
+        .sortVertical = false,
+        .leakAmount = 0.5f
     };
 
     // Parse options
@@ -315,6 +322,28 @@ void printUsage(std::string_view programName) {
         else if (arg == "--effect-levels" && i + 1 < args.size()) {
             if (auto val = safeStoi(args[++i])) {
                 currentEffect.levels = *val;
+            }
+        }
+        else if (arg == "--effect-threshold" && i + 1 < args.size()) {
+            if (auto val = safeStoi(args[++i])) {
+                currentEffect.threshold = std::clamp(*val, 0, 255);
+            }
+        }
+        else if (arg == "--effect-sortmode" && i + 1 < args.size()) {
+            std::string_view mode = args[++i];
+            if (mode == "brightness") currentEffect.sortMode = PixelSortMode::BRIGHTNESS;
+            else if (mode == "hue") currentEffect.sortMode = PixelSortMode::HUE;
+            else if (mode == "saturation") currentEffect.sortMode = PixelSortMode::SATURATION;
+            else if (mode == "red") currentEffect.sortMode = PixelSortMode::RED;
+            else if (mode == "green") currentEffect.sortMode = PixelSortMode::GREEN;
+            else if (mode == "blue") currentEffect.sortMode = PixelSortMode::BLUE;
+        }
+        else if (arg == "--effect-vertical") {
+            currentEffect.sortVertical = true;
+        }
+        else if (arg == "--effect-leak" && i + 1 < args.size()) {
+            if (auto val = safeStof(args[++i])) {
+                currentEffect.leakAmount = std::clamp(*val, 0.0f, 1.0f);
             }
         }
         else if (arg == "--help" || arg == "-h") {
