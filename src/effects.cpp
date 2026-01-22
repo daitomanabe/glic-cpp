@@ -14,17 +14,23 @@ std::string effectName(EffectType et) {
         case EffectType::DITHER: return "DITHER";
         case EffectType::POSTERIZE: return "POSTERIZE";
         case EffectType::GLITCH_SHIFT: return "GLITCH_SHIFT";
+        case EffectType::DCT_CORRUPT: return "DCT_CORRUPT";
+        case EffectType::PIXEL_SORT: return "PIXEL_SORT";
+        case EffectType::PREDICTION_LEAK: return "PREDICTION_LEAK";
         default: return "NONE";
     }
 }
 
 EffectType effectFromName(const std::string& name) {
-    if (name == "PIXELATE") return EffectType::PIXELATE;
-    if (name == "SCANLINE") return EffectType::SCANLINE;
-    if (name == "CHROMATIC_ABERRATION" || name == "CHROMATIC") return EffectType::CHROMATIC_ABERRATION;
-    if (name == "DITHER") return EffectType::DITHER;
-    if (name == "POSTERIZE") return EffectType::POSTERIZE;
-    if (name == "GLITCH_SHIFT" || name == "GLITCH") return EffectType::GLITCH_SHIFT;
+    if (name == "PIXELATE" || name == "pixelate") return EffectType::PIXELATE;
+    if (name == "SCANLINE" || name == "scanline") return EffectType::SCANLINE;
+    if (name == "CHROMATIC_ABERRATION" || name == "CHROMATIC" || name == "chromatic") return EffectType::CHROMATIC_ABERRATION;
+    if (name == "DITHER" || name == "dither") return EffectType::DITHER;
+    if (name == "POSTERIZE" || name == "posterize") return EffectType::POSTERIZE;
+    if (name == "GLITCH_SHIFT" || name == "GLITCH" || name == "glitch") return EffectType::GLITCH_SHIFT;
+    if (name == "DCT_CORRUPT" || name == "DCT" || name == "dct") return EffectType::DCT_CORRUPT;
+    if (name == "PIXEL_SORT" || name == "SORT" || name == "sort") return EffectType::PIXEL_SORT;
+    if (name == "PREDICTION_LEAK" || name == "LEAK" || name == "leak") return EffectType::PREDICTION_LEAK;
     return EffectType::NONE;
 }
 
@@ -52,6 +58,15 @@ void applyEffect(
             break;
         case EffectType::GLITCH_SHIFT:
             effectGlitchShift(pixels, width, height, config.blockSize, config.seed);
+            break;
+        case EffectType::DCT_CORRUPT:
+            effectDctCorrupt(pixels, width, height, config.blockSize, config.intensity, config.seed);
+            break;
+        case EffectType::PIXEL_SORT:
+            effectPixelSort(pixels, width, height, config.sortMode, config.threshold, config.sortVertical);
+            break;
+        case EffectType::PREDICTION_LEAK:
+            effectPredictionLeak(pixels, width, height, config.blockSize, config.leakAmount, config.seed);
             break;
         default:
             break;
@@ -224,6 +239,327 @@ void effectGlitchShift(std::vector<Color>& pixels, int w, int h, int blockSize, 
                 for (int x = 0; x < w; x++) {
                     int srcX = ((x - shift) % w + w) % w;
                     result[static_cast<size_t>(y * w + x)] = pixels[static_cast<size_t>(y * w + srcX)];
+                }
+            }
+        }
+    }
+
+    pixels = std::move(result);
+}
+
+// DCT_CORRUPT - Rosa Menkman inspired DCT block corruption
+// Simulates JPEG compression artifacts by manipulating 8x8 blocks
+void effectDctCorrupt(std::vector<Color>& pixels, int w, int h, int blockSize, int intensity, uint32_t seed) {
+    if (blockSize < 2) blockSize = 8;
+
+    std::mt19937 rng(seed);
+    std::uniform_int_distribution<int> probDist(0, 100);
+    std::uniform_int_distribution<int> corruptTypeDist(0, 5);
+
+    float scale = static_cast<float>(intensity) / 100.0f;
+
+    for (int by = 0; by < h; by += blockSize) {
+        for (int bx = 0; bx < w; bx += blockSize) {
+            // Decide if this block should be corrupted
+            if (probDist(rng) > static_cast<int>(scale * 50)) continue;
+
+            int corruptType = corruptTypeDist(rng);
+
+            // Calculate block average for some effects
+            int avgR = 0, avgG = 0, avgB = 0;
+            int count = 0;
+            for (int y = by; y < std::min(by + blockSize, h); y++) {
+                for (int x = bx; x < std::min(bx + blockSize, w); x++) {
+                    Color c = pixels[static_cast<size_t>(y * w + x)];
+                    avgR += getR(c);
+                    avgG += getG(c);
+                    avgB += getB(c);
+                    count++;
+                }
+            }
+            if (count > 0) {
+                avgR /= count;
+                avgG /= count;
+                avgB /= count;
+            }
+
+            // Apply corruption to block
+            for (int y = by; y < std::min(by + blockSize, h); y++) {
+                for (int x = bx; x < std::min(bx + blockSize, w); x++) {
+                    Color c = pixels[static_cast<size_t>(y * w + x)];
+                    int r = getR(c);
+                    int g = getG(c);
+                    int b = getB(c);
+
+                    // DCT basis function approximation (simplified cosine pattern)
+                    int lx = x - bx;
+                    int ly = y - by;
+                    float basis = std::cos(static_cast<float>(lx * ly) * 0.5f);
+
+                    switch (corruptType) {
+                        case 0: // DC coefficient shift (uniform color shift)
+                            r = std::clamp(r + static_cast<int>(avgR * 0.3f * scale), 0, 255);
+                            g = std::clamp(g + static_cast<int>(avgG * 0.3f * scale), 0, 255);
+                            b = std::clamp(b + static_cast<int>(avgB * 0.3f * scale), 0, 255);
+                            break;
+                        case 1: // AC coefficient boost (edge enhancement)
+                            r = static_cast<int>(r + (r - avgR) * scale * basis);
+                            g = static_cast<int>(g + (g - avgG) * scale * basis);
+                            b = static_cast<int>(b + (b - avgB) * scale * basis);
+                            break;
+                        case 2: // Quantize heavily (banding)
+                            r = (r / 32) * 32;
+                            g = (g / 32) * 32;
+                            b = (b / 32) * 32;
+                            break;
+                        case 3: // Shift block color (green unchanged)
+                            r = (r + static_cast<int>(basis * 64 * scale)) % 256;
+                            b = (b - static_cast<int>(basis * 64 * scale) + 256) % 256;
+                            break;
+                        case 4: // Posterize with DCT pattern
+                            {
+                                int levels = 4 + static_cast<int>(basis * 4);
+                                float step = 255.0f / levels;
+                                r = static_cast<int>(std::round(r / step) * step);
+                                g = static_cast<int>(std::round(g / step) * step);
+                                b = static_cast<int>(std::round(b / step) * step);
+                            }
+                            break;
+                        case 5: // Complete block replacement (macroblock error)
+                            r = avgR;
+                            g = avgG;
+                            b = avgB;
+                            break;
+                    }
+
+                    pixels[static_cast<size_t>(y * w + x)] = makeColor(
+                        static_cast<uint8_t>(std::clamp(r, 0, 255)),
+                        static_cast<uint8_t>(std::clamp(g, 0, 255)),
+                        static_cast<uint8_t>(std::clamp(b, 0, 255)),
+                        getA(c)
+                    );
+                }
+            }
+        }
+    }
+}
+
+// Helper functions for pixel sorting
+namespace {
+
+float getPixelBrightness(Color c) {
+    return (getR(c) * 0.299f + getG(c) * 0.587f + getB(c) * 0.114f) / 255.0f;
+}
+
+float getPixelHue(Color c) {
+    float r = getR(c) / 255.0f;
+    float g = getG(c) / 255.0f;
+    float b = getB(c) / 255.0f;
+
+    float maxVal = std::max({r, g, b});
+    float minVal = std::min({r, g, b});
+    float delta = maxVal - minVal;
+
+    if (delta < 0.00001f) return 0.0f;
+
+    float hue = 0.0f;
+    if (maxVal == r) {
+        hue = 60.0f * std::fmod((g - b) / delta, 6.0f);
+    } else if (maxVal == g) {
+        hue = 60.0f * ((b - r) / delta + 2.0f);
+    } else {
+        hue = 60.0f * ((r - g) / delta + 4.0f);
+    }
+
+    if (hue < 0) hue += 360.0f;
+    return hue / 360.0f;
+}
+
+float getPixelSaturation(Color c) {
+    float r = getR(c) / 255.0f;
+    float g = getG(c) / 255.0f;
+    float b = getB(c) / 255.0f;
+
+    float maxVal = std::max({r, g, b});
+    float minVal = std::min({r, g, b});
+
+    if (maxVal < 0.00001f) return 0.0f;
+    return (maxVal - minVal) / maxVal;
+}
+
+float getPixelSortValue(Color c, PixelSortMode mode) {
+    switch (mode) {
+        case PixelSortMode::BRIGHTNESS:
+            return getPixelBrightness(c);
+        case PixelSortMode::HUE:
+            return getPixelHue(c);
+        case PixelSortMode::SATURATION:
+            return getPixelSaturation(c);
+        case PixelSortMode::RED:
+            return getR(c) / 255.0f;
+        case PixelSortMode::GREEN:
+            return getG(c) / 255.0f;
+        case PixelSortMode::BLUE:
+            return getB(c) / 255.0f;
+        default:
+            return getPixelBrightness(c);
+    }
+}
+
+} // anonymous namespace
+
+// PIXEL_SORT - Kim Asendorf inspired pixel sorting
+void effectPixelSort(std::vector<Color>& pixels, int w, int h, PixelSortMode mode, int threshold, bool vertical) {
+    float thresholdNorm = static_cast<float>(threshold) / 255.0f;
+
+    if (vertical) {
+        // Sort columns
+        for (int x = 0; x < w; x++) {
+            int sortStart = -1;
+
+            for (int y = 0; y <= h; y++) {
+                bool inInterval = false;
+                if (y < h) {
+                    Color c = pixels[static_cast<size_t>(y * w + x)];
+                    float val = getPixelBrightness(c);
+                    inInterval = (val > thresholdNorm && val < (1.0f - thresholdNorm * 0.5f));
+                }
+
+                if (inInterval && sortStart == -1) {
+                    sortStart = y;
+                } else if (!inInterval && sortStart != -1) {
+                    // Sort the interval
+                    std::vector<Color> interval;
+                    for (int sy = sortStart; sy < y; sy++) {
+                        interval.push_back(pixels[static_cast<size_t>(sy * w + x)]);
+                    }
+
+                    std::sort(interval.begin(), interval.end(),
+                        [mode](Color a, Color b) {
+                            return getPixelSortValue(a, mode) < getPixelSortValue(b, mode);
+                        });
+
+                    for (int sy = sortStart; sy < y; sy++) {
+                        pixels[static_cast<size_t>(sy * w + x)] = interval[static_cast<size_t>(sy - sortStart)];
+                    }
+
+                    sortStart = -1;
+                }
+            }
+        }
+    } else {
+        // Sort rows
+        for (int y = 0; y < h; y++) {
+            int sortStart = -1;
+
+            for (int x = 0; x <= w; x++) {
+                bool inInterval = false;
+                if (x < w) {
+                    Color c = pixels[static_cast<size_t>(y * w + x)];
+                    float val = getPixelBrightness(c);
+                    inInterval = (val > thresholdNorm && val < (1.0f - thresholdNorm * 0.5f));
+                }
+
+                if (inInterval && sortStart == -1) {
+                    sortStart = x;
+                } else if (!inInterval && sortStart != -1) {
+                    // Sort the interval
+                    std::vector<Color> interval;
+                    for (int sx = sortStart; sx < x; sx++) {
+                        interval.push_back(pixels[static_cast<size_t>(y * w + sx)]);
+                    }
+
+                    std::sort(interval.begin(), interval.end(),
+                        [mode](Color a, Color b) {
+                            return getPixelSortValue(a, mode) < getPixelSortValue(b, mode);
+                        });
+
+                    for (int sx = sortStart; sx < x; sx++) {
+                        pixels[static_cast<size_t>(y * w + sx)] = interval[static_cast<size_t>(sx - sortStart)];
+                    }
+
+                    sortStart = -1;
+                }
+            }
+        }
+    }
+}
+
+// PREDICTION_LEAK - Datamoshing inspired motion vector leaking
+// Simulates P-frame prediction errors where motion vectors "leak" between blocks
+void effectPredictionLeak(std::vector<Color>& pixels, int w, int h, int blockSize, float leakAmount, uint32_t seed) {
+    if (blockSize < 2) blockSize = 16;
+
+    std::mt19937 rng(seed);
+    std::uniform_int_distribution<int> mvDist(-blockSize, blockSize);
+    std::uniform_real_distribution<float> probDist(0.0f, 1.0f);
+
+    std::vector<Color> result = pixels;
+
+    // Store motion vectors for each block
+    int blocksX = (w + blockSize - 1) / blockSize;
+    int blocksY = (h + blockSize - 1) / blockSize;
+
+    std::vector<std::pair<int, int>> motionVectors(static_cast<size_t>(blocksX * blocksY));
+
+    // Generate initial motion vectors
+    for (auto& mv : motionVectors) {
+        mv.first = mvDist(rng);
+        mv.second = mvDist(rng);
+    }
+
+    // Apply motion vectors with leaking
+    for (int by = 0; by < blocksY; by++) {
+        for (int bx = 0; bx < blocksX; bx++) {
+            int blockIdx = by * blocksX + bx;
+
+            // Get motion vector (potentially leaked from neighbor)
+            int mvX = motionVectors[static_cast<size_t>(blockIdx)].first;
+            int mvY = motionVectors[static_cast<size_t>(blockIdx)].second;
+
+            // Leak from previous block
+            if (probDist(rng) < leakAmount) {
+                int leakSource = -1;
+                int leakDir = static_cast<int>(probDist(rng) * 4);
+
+                switch (leakDir) {
+                    case 0: // Left
+                        if (bx > 0) leakSource = by * blocksX + (bx - 1);
+                        break;
+                    case 1: // Right
+                        if (bx < blocksX - 1) leakSource = by * blocksX + (bx + 1);
+                        break;
+                    case 2: // Up
+                        if (by > 0) leakSource = (by - 1) * blocksX + bx;
+                        break;
+                    case 3: // Down
+                        if (by < blocksY - 1) leakSource = (by + 1) * blocksX + bx;
+                        break;
+                }
+
+                if (leakSource >= 0) {
+                    mvX = motionVectors[static_cast<size_t>(leakSource)].first;
+                    mvY = motionVectors[static_cast<size_t>(leakSource)].second;
+                }
+            }
+
+            // Apply motion vector to block
+            for (int ly = 0; ly < blockSize; ly++) {
+                for (int lx = 0; lx < blockSize; lx++) {
+                    int destX = bx * blockSize + lx;
+                    int destY = by * blockSize + ly;
+
+                    if (destX >= w || destY >= h) continue;
+
+                    int srcX = destX + mvX;
+                    int srcY = destY + mvY;
+
+                    // Clamp source coordinates
+                    srcX = std::clamp(srcX, 0, w - 1);
+                    srcY = std::clamp(srcY, 0, h - 1);
+
+                    result[static_cast<size_t>(destY * w + destX)] =
+                        pixels[static_cast<size_t>(srcY * w + srcX)];
                 }
             }
         }

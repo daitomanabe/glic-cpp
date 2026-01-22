@@ -125,12 +125,16 @@ void printUsage(const char* programName) {
     std::cout << "  --border <r,g,b>         Border color RGB (default: 128,128,128)\n";
     std::cout << "\nDecode Options (Post-Effects):\n";
     std::cout << "  --effect <name>          Apply post effect (can be used multiple times)\n";
-    std::cout << "                           Options: pixelate, scanline, chromatic, dither,\n";
-    std::cout << "                                    posterize, glitch\n";
+    std::cout << "                           Basic: pixelate, scanline, chromatic, dither, posterize, glitch\n";
+    std::cout << "                           Advanced: dct, sort, leak\n";
     std::cout << "  --effect-intensity <n>   Effect intensity 0-100 (default: 50)\n";
-    std::cout << "  --effect-blocksize <n>   Effect block size for pixelate/glitch (default: 8)\n";
+    std::cout << "  --effect-blocksize <n>   Block size for pixelate/glitch/dct/leak (default: 8)\n";
     std::cout << "  --effect-offset <x,y>    Chromatic aberration offset (default: 2,0)\n";
     std::cout << "  --effect-levels <n>      Posterize levels (default: 4)\n";
+    std::cout << "  --effect-threshold <n>   Pixel sort threshold 0-255 (default: 50)\n";
+    std::cout << "  --effect-sortmode <m>    Sort mode: brightness, hue, saturation, red, green, blue\n";
+    std::cout << "  --effect-vertical        Enable vertical sorting (default: horizontal)\n";
+    std::cout << "  --effect-leak <f>        Prediction leak amount 0.0-1.0 (default: 0.5)\n";
     std::cout << "\nExamples:\n";
     std::cout << "  " << programName << " encode photo.png glitched.glic\n";
     std::cout << "  " << programName << " encode photo.png glitched.glic --colorspace HWB --prediction SPIRAL\n";
@@ -178,6 +182,11 @@ bool parseArgs(int argc, char* argv[], std::string& command, std::string& input,
     currentEffect.offsetX = 2;
     currentEffect.offsetY = 0;
     currentEffect.levels = 4;
+    currentEffect.seed = 12345;
+    currentEffect.sortMode = PixelSortMode::BRIGHTNESS;
+    currentEffect.threshold = 50;
+    currentEffect.sortVertical = false;
+    currentEffect.leakAmount = 0.5f;
 
     // Parse options
     for (int i = 4; i < argc; i++) {
@@ -288,6 +297,30 @@ bool parseArgs(int argc, char* argv[], std::string& command, std::string& input,
             auto val = safeStoi(argv[++i]);
             if (val.has_value()) {
                 currentEffect.levels = val.value();
+            }
+        }
+        else if (arg == "--effect-threshold" && i + 1 < argc) {
+            auto val = safeStoi(argv[++i]);
+            if (val.has_value()) {
+                currentEffect.threshold = std::clamp(val.value(), 0, 255);
+            }
+        }
+        else if (arg == "--effect-sortmode" && i + 1 < argc) {
+            std::string mode = argv[++i];
+            if (mode == "brightness") currentEffect.sortMode = PixelSortMode::BRIGHTNESS;
+            else if (mode == "hue") currentEffect.sortMode = PixelSortMode::HUE;
+            else if (mode == "saturation") currentEffect.sortMode = PixelSortMode::SATURATION;
+            else if (mode == "red") currentEffect.sortMode = PixelSortMode::RED;
+            else if (mode == "green") currentEffect.sortMode = PixelSortMode::GREEN;
+            else if (mode == "blue") currentEffect.sortMode = PixelSortMode::BLUE;
+        }
+        else if (arg == "--effect-vertical") {
+            currentEffect.sortVertical = true;
+        }
+        else if (arg == "--effect-leak" && i + 1 < argc) {
+            auto val = safeStof(argv[++i]);
+            if (val.has_value()) {
+                currentEffect.leakAmount = std::clamp(val.value(), 0.0f, 1.0f);
             }
         }
         else if (arg == "--help" || arg == "-h") {
